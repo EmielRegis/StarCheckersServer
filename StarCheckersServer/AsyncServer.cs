@@ -93,8 +93,8 @@ namespace StarCheckersServer
                         {
                             if (content == "end")
                             {
-                                Pair.Send(Pair.WorkSocket, content);
-                                Send(WorkSocket, content);
+//                                Pair.Send(Pair.WorkSocket, content);
+//                                Send(WorkSocket, content);
 
                                 //                            if (EndEvent != null)
                                 //                                EndEvent();
