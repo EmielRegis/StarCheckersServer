@@ -53,47 +53,63 @@ namespace StarCheckersServer
 
         private void ReadCallback(IAsyncResult ar)
         {
-            // Retrieve the state object and the handler socket
-            // from the asynchronous state object.
-            UserConnector state = (UserConnector)ar.AsyncState;
-            Socket handler = state.WorkSocket;
-
-            // Read data from the client socket.
-            if (handler.Connected)
+            try
             {
-                int bytesRead = handler.EndReceive(ar);
+                // Retrieve the state object and the handler socket
+                // from the asynchronous state object.
+                UserConnector state = (UserConnector)ar.AsyncState;
+                Socket handler = state.WorkSocket;
 
-                if (bytesRead > 0)
+                // Read data from the client socket.
+                if (handler != null && handler.Connected)
                 {
-                    state._stringBuilder.Clear();
-                    // There  might be more data, so store the data received so far.
-                    state._stringBuilder.Append(Encoding.ASCII.GetString(
-                        state._buffer, 0, bytesRead));
-
-                    // Check for end-of-file tag. If it is not there, read 
-                    // more data.
-                    var content = state._stringBuilder.ToString();
-
-                    // Echo the data back to the client.
-                    Console.WriteLine("Read {0} bytes from socket. \n Data : {1}",
-                        content.Length, content);
-                    
-                    if (IsPaired)
+                    int bytesRead = 0;
+                    try
                     {
-                        if (content == "end")
-                        {
-                            Pair.Send(Pair.WorkSocket, content);
-                            Send(WorkSocket, content);
+                        bytesRead = handler.EndReceive(ar);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex);
+                        return;
+                    }
 
-//                            if (EndEvent != null)
-//                                EndEvent();
+                    if (bytesRead > 0)
+                    {
+                        state._stringBuilder.Clear();
+                        // There  might be more data, so store the data received so far.
+                        state._stringBuilder.Append(Encoding.ASCII.GetString(
+                            state._buffer, 0, bytesRead));
+
+                        // Check for end-of-file tag. If it is not there, read 
+                        // more data.
+                        var content = state._stringBuilder.ToString();
+
+                        // Echo the data back to the client.
+                        Console.WriteLine("Read {0} bytes from socket. \n Data : {1}",
+                            content.Length, content);
+
+                        if (IsPaired)
+                        {
+                            if (content == "end")
+                            {
+                                Pair.Send(Pair.WorkSocket, content);
+                                Send(WorkSocket, content);
+
+                                //                            if (EndEvent != null)
+                                //                                EndEvent();
+                            }
+                            else
+                                Pair.Send(Pair.WorkSocket, content);
                         }
                         else
-                            Pair.Send(Pair.WorkSocket, content);
+                            Send(handler, "any");
                     }
-                    else
-                        Send(handler, "any");
                 }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
             }
         }
 
@@ -104,7 +120,7 @@ namespace StarCheckersServer
 
             // Begin sending the data to the remote device.
             handler.BeginSend(byteData, 0, byteData.Length, 0,
-                (data != "end" && data != "black") ? SendCallback : new AsyncCallback(SendCallbackNoWait), handler);
+                (data != "end" && data != "black" && data != "user_disconnected") ? SendCallback : new AsyncCallback(SendCallbackNoWait), handler);
         }
 
         private void SendCallbackNoWait(IAsyncResult ar)
@@ -115,8 +131,19 @@ namespace StarCheckersServer
                 Socket handler = (Socket)ar.AsyncState;
 
                 // Complete sending the data to the remote device.
-                int bytesSent = handler.EndSend(ar);
-                Console.WriteLine("Sent {0} bytes to client: {1}", bytesSent, handler.RemoteEndPoint);
+                if (handler != null && handler.Connected)
+                {
+                    try
+                    {
+                        int bytesSent = handler.EndSend(ar);
+                        Console.WriteLine("Sent {0} bytes to client: {1}", bytesSent, handler.RemoteEndPoint);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex);
+                    }
+                }
+
             }
             catch (Exception e)
             {
@@ -131,11 +158,21 @@ namespace StarCheckersServer
                 // Retrieve the socket from the state object.
                 Socket handler = (Socket)ar.AsyncState;
 
-                // Complete sending the data to the remote device.
-                int bytesSent = handler.EndSend(ar);
-                Console.WriteLine("Sent {0} bytes to client: {1}", bytesSent, handler.RemoteEndPoint);
+                if (handler != null && handler.Connected)
+                {
+                    try
+                    {
+                        // Complete sending the data to the remote device.
+                        int bytesSent = handler.EndSend(ar);
+                        Console.WriteLine("Sent {0} bytes to client: {1}", bytesSent, handler.RemoteEndPoint);
 
-                WaitForMessage();
+                        WaitForMessage();
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine(e);
+                    }
+                }
             }
             catch (Exception e)
             {
@@ -145,8 +182,15 @@ namespace StarCheckersServer
 
         public void Dispose()
         {
-            WorkSocket.Shutdown(SocketShutdown.Both);
-            WorkSocket.Close();
+            try
+            {
+                WorkSocket.Shutdown(SocketShutdown.Both);
+                WorkSocket.Close();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+            }
         }
     }
 
@@ -163,7 +207,7 @@ namespace StarCheckersServer
             // The DNS name of the computer
             // running the listener is "host.contoso.com".
             IPHostEntry ipHostInfo = Dns.Resolve(Dns.GetHostName());
-            IPAddress ipAddress = ipHostInfo.AddressList.FirstOrDefault(adr => adr.ToString().StartsWith("25")) ??
+            IPAddress ipAddress = ipHostInfo.AddressList.FirstOrDefault(adr => adr.ToString().StartsWith("19")) ??
                                   ipHostInfo.AddressList.FirstOrDefault();
             if (ipAddress == null)
             {
